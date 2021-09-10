@@ -2,7 +2,7 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "./PDOG.sol";
+import "./StakingTokenA.sol";
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -301,16 +301,15 @@ library SafeMath {
 contract PDOGStaking is Ownable{		
     using SafeMath for uint256;
 	string public name = "PDOG - Staking";
-    PDOG public tokenA;
+    StakingTokenA public tokenA;
     uint256 public rewardRate;
-
 	address[] public stakers;
 	mapping(address=>uint256) public stakingStartTime; // to manage the time when the user started the staking 
-	mapping(address => uint) public earnedBalance;     // to manage the staking of token A  and distibue the profit as token B
+	mapping(address => uint) public stakedBalance;     // to manage the staking of token A  and distibue the profit as token B
 	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
 
-	constructor(PDOG _tokenA, uint256 _rewardRate) {
+	constructor(StakingTokenA _tokenA, uint256 _rewardRate) {
 		tokenA = _tokenA;
         rewardRate = _rewardRate;
 	}
@@ -324,44 +323,54 @@ contract PDOGStaking is Ownable{
         require(tokenA.balanceOf(msg.sender) > _amount);
 		tokenA.transferFrom(msg.sender, address(this), _amount);
 		// update staking balance
-		earnedBalance[msg.sender] = earnedBalance[msg.sender] + _amount;		
-
+		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount;		
 		// add user to stakers array *only* if they haven't staked already
 		// save the time when they started staking 
 		if(!hasStaked[msg.sender]) {
 			stakers.push(msg.sender);
 			stakingStartTime[msg.sender] = block.timestamp;
 		}
-
 		// update stakng status
 		isStaking[msg.sender] = true;
 		hasStaked[msg.sender] = true;
 		
 		
 	}
-   
-    function myReward() public {
+
+    function unstakeTokenA() public {
+        require(isStaking[msg.sender], "User have no staked tokens to unstake");
 		// fetch staking balance
-		uint balance = earnedBalance[msg.sender];
+		uint balance = stakedBalance[msg.sender];
 		// require amount greter than 0
 		require(balance > 0, "staking balance cannot be 0");
-		uint256 timeDifference = block.timestamp - stakingStartTime[msg.sender];
-		//Reward Calculation
-		uint256 reward = balance.mul(rewardRate).mul(timeDifference).mul(rewardRate).div(100);
-        require(tokenA.balanceOf(address(this)) > reward);
-		// transfer tokenA tokens from this contract for unstaking
-		tokenA.transfer(msg.sender, reward);
+		// transfer tokens from this contract for unstaking
+		tokenA.transfer(msg.sender, balance);
 		// reset staking balance
-		earnedBalance[msg.sender] = 0;
+		stakedBalance[msg.sender] = 0;
 		// update staking status and stakingStartTime (restore to zero)
 		isStaking[msg.sender] = false;
 		stakingStartTime[msg.sender] = 0;
+		
+	}
+   
+    function myReward() public {
+        require(isStaking[msg.sender], "User have no staked tokens to get the reward");
+		// fetch staking balance
+		uint balance = stakedBalance[msg.sender];
+		// require amount greter than 0
+		require(balance > 0, "staking balance cannot be 0");
+		uint256 timeDifference = block.timestamp - stakingStartTime[msg.sender];
+		uint256 timeDifferenceInHours = timeDifference.div(3600);
+		//Reward Calculation
+		uint256 reward = balance.mul(rewardRate).mul(timeDifferenceInHours).mul(rewardRate).div(100);
+        require(tokenA.balanceOf(address(this)) > reward, "Not Enough tokens in the smart contract");
+		tokenA.transfer(msg.sender, reward);
+		//stakingStartTime (set to current time)
+		stakingStartTime[msg.sender] = block.timestamp;
 		
 	}
 
     function setRewardRate(uint256 _rewardRate) external onlyOwner {
         rewardRate = _rewardRate;
     }
-    
-
 }
