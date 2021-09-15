@@ -366,7 +366,6 @@ contract PDOGStaking is Ownable, Pausable {
 	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
 	mapping(address => uint256) public oldReward;
-	uint256 public old;
 
 	constructor(IERC20 _tokenA, uint256 _rewardRate) {
 		tokenA = _tokenA;
