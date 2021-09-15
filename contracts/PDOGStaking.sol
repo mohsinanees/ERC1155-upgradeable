@@ -386,6 +386,10 @@ contract PDOGStaking is Ownable, Pausable {
 		if(!hasStaked[msg.sender]) {
 			stakers.push(msg.sender);
 		}
+		if(isStaking[msg.sender]){
+		    uint256 oldR = calculateReward();
+		    oldReward[msg.sender] = oldReward[msg.sender] + oldR;
+		}
 		
 		tokenA.transferFrom(msg.sender, address(this), _amount);
 		// update staking balance
@@ -395,34 +399,16 @@ contract PDOGStaking is Ownable, Pausable {
 		isStaking[msg.sender] = true;
 		hasStaked[msg.sender] = true;
 		
-	}
-	
-    function oldRewardC() external returns(uint256){
-		(uint256 oldRewardCalculation) = calculateReward(); 
-		//old = oldRewardCalculation;
-		oldReward[msg.sender] = oldReward[msg.sender] + oldRewardCalculation;
-		return oldReward[msg.sender];
-		
     }
-    
-    function setReward() external view onlyOwner whenNotPaused returns(uint256){
-        (uint256 oldRewardCalculation) = calculateReward(); 
-        return oldRewardCalculation;
-    }
-    
     
     function unstakeTokenA() public whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to unstake");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "staking balance cannot be 0");
         uint256 reward = calculateReward();
-
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         rewardToken.transfer(msg.sender, totalReward);
 		tokenA.transfer(msg.sender, balance);
-
-         
-           
 		oldReward[msg.sender] = 0;
 		// reset staking balance
 		stakedBalance[msg.sender] = 0;
@@ -433,14 +419,12 @@ contract PDOGStaking is Ownable, Pausable {
 	}
 
     function calculateReward() public view returns(uint256){
-    
         uint balance = stakedBalance[msg.sender];
 		// require amount greter than 0
 		require(balance > 0, "staking balance cannot be 0");
 		uint256 timeDifference = block.timestamp - stakingStartTime[msg.sender];
-		uint256 timeDifferenceInHours = timeDifference.div(3600);
 		//Reward Calculation
-		uint256 reward = balance.mul(timeDifferenceInHours).mul(rewardRate).div(100);
+		uint256 reward = balance.mul(timeDifference).mul(rewardRate).div(100).div(3600);
 		return reward;
 
     }
