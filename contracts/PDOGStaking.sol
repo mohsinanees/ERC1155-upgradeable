@@ -360,24 +360,30 @@ contract PDOGStaking is Ownable, Pausable {
     IERC20 public tokenA;
     IERC20 public rewardToken;
     uint256 public rewardRate;
+    uint256 public blockLimit;
 	address[] public stakers;
 	mapping(address=>uint256) public stakingStartTime; // to manage the time when the user started the staking 
 	mapping(address => uint) public stakedBalance;     // to manage the staking of token A  and distibue the profit as token B
 	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
 	mapping(address => uint256) public oldReward;
+	
+	event Reward(address indexed from, address indexed to, uint256 amount);
+	event StakeTransfer(address indexed from, address indexed to, uint256 amount);
 
-	constructor(IERC20 _tokenA, uint256 _rewardRate) {
+	constructor(IERC20 _tokenA, uint256 _rewardRate, uint256 _blockLimit) {
 		tokenA = _tokenA;
 		rewardToken = _tokenA;
         rewardRate = _rewardRate;
+        blockLimit = _blockLimit;
 	}
 
 	/* Stakes Tokens (Deposit): An investor will deposit the TokenA into the smart contracts
 	to starting earning rewards.
 		
 	Core Thing: Transfer the tokenA from the investor's wallet to this smart contract. */
-	function stakeTokenA(uint _amount) public whenNotPaused {		
+	function stakeTokenA(uint _amount) public whenNotPaused {
+        require(block.number >= blockLimit, "current block number is below the Block Limit");		
         require(_amount > 0, "staking balance cannot be 0");
         require(tokenA.balanceOf(msg.sender) > _amount);
 		// add user to stakers array *only* if they haven't staked already
@@ -391,6 +397,7 @@ contract PDOGStaking is Ownable, Pausable {
 		}
 		
 		tokenA.transferFrom(msg.sender, address(this), _amount);
+		emit StakeTransfer(msg.sender, address(this), _amount);
 		// update staking balance
 		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount;
 		// update stakng status
@@ -406,8 +413,12 @@ contract PDOGStaking is Ownable, Pausable {
         require(balance > 0, "staking balance cannot be 0");
         uint256 reward = calculateReward();
         uint256 totalReward = reward.add(oldReward[msg.sender]);
+        
         rewardToken.transfer(msg.sender, totalReward);
+        emit Reward(address(this), msg.sender, totalReward);
+        
 		tokenA.transfer(msg.sender, balance);
+		emit StakeTransfer(address(this), msg.sender, balance);
 		oldReward[msg.sender] = 0;
 		// reset staking balance
 		stakedBalance[msg.sender] = 0;
@@ -437,6 +448,7 @@ contract PDOGStaking is Ownable, Pausable {
         uint256 tReward = reward.add(oldReward[msg.sender]);
         require(rewardToken.balanceOf(address(this)) > tReward, "Not Enough tokens in the smart contract");
 		rewardToken.transfer(msg.sender, tReward);
+        emit Reward(address(this), msg.sender, tReward);
 		//stakingStartTime (set to current time)
 		stakingStartTime[msg.sender] = block.timestamp;
 		
