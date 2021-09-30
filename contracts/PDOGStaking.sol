@@ -514,7 +514,12 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     }
     
      function withdrawFromStaked(uint256 amount) public nonReentrant {
+        require(isStaking[msg.sender], "User have no staked tokens to unstake");
         require(amount > 0, "Cannot withdraw 0");
+        uint256 oldR = calculateReward();
+        if(oldR >0 && oldR <= rewardToken.balanceOf(address(this))){
+            oldReward[msg.sender] = oldReward[msg.sender] + oldR;
+        }
         stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(amount);
         tokenA.transfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
