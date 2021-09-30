@@ -441,6 +441,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     event EthFromContractTransferred(
         uint256 amount
     );
+
+    event SetRewardRate(uint256 rate);
+    event SetRewardToken(address token);
+
     
 
 	constructor(IERC20 _tokenA, uint256 _rewardRate, uint256 _blockLimit) {
@@ -513,7 +517,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 
     }
     
-     function withdrawFromStaked(uint256 amount) public nonReentrant {
+    function withdrawFromStaked(uint256 amount) public nonReentrant {
         require(isStaking[msg.sender], "User have no staked tokens to unstake");
         require(amount > 0, "Cannot withdraw 0");
         uint256 oldR = calculateReward();
@@ -568,9 +572,12 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 
     function setRewardRate(uint256 _rewardRate) external onlyOwner whenNotPaused {
         rewardRate = _rewardRate;
+        event SetRewardRate(uint256 rewardRate);
+    
     }
     
     function setRewardToken(IERC20 _tokenA) external onlyOwner whenNotPaused {
         rewardToken = _tokenA;
+        event SetRewardToken(address rewardToken);
     }
 }
