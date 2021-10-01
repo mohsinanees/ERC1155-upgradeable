@@ -443,7 +443,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     );
 
     event SetRewardRate(uint256 rate);
-    event SetRewardToken(address token);
+    event SetRewardToken(IERC20 token);
 
     
 
@@ -458,7 +458,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	to starting earning rewards.
 		
 	Core Thing: Transfer the tokenA from the investor's wallet to this smart contract. */
-	function stakeTokenA(uint _amount) public nonReentrant whenNotPaused {
+	function stakeTokenA(uint _amount) external virtual nonReentrant whenNotPaused {
         require(block.number >= blockLimit, "current block number is below the Block Limit");		
         require(_amount > 0, "staking balance cannot be 0");
         require(tokenA.balanceOf(msg.sender) > _amount);
@@ -483,7 +483,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		
     }
     
-    function unstakeTokenA() public nonReentrant whenNotPaused {
+    function unstakeTokenA() external virtual nonReentrant whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to unstake");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "staking balance cannot be 0");
@@ -507,17 +507,20 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	}
 
     function calculateReward() public view returns(uint256){
-        uint balance = stakedBalance[msg.sender];
+        uint balances = stakedBalance[msg.sender];
 		// require amount greter than 0
-		require(balance > 0, "staking balance cannot be 0");
-		uint256 timeDifference = block.timestamp - stakingStartTime[msg.sender];
-		//Reward Calculation
-		uint256 reward = balance.mul(timeDifference).mul(rewardRate).div(100).div(3600);
-		return reward;
+		uint256 rewards = 0;
+		if(balances > 0){
+		    uint256 timeDifferences = block.timestamp - stakingStartTime[msg.sender];
+		    //Reward Calculation
+		    rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(3600);
+		}
+		return rewards;
 
     }
     
-    function withdrawFromStaked(uint256 amount) public nonReentrant {
+ 
+    function withdrawFromStaked(uint256 amount) external virtual nonReentrant {
         require(isStaking[msg.sender], "User have no staked tokens to unstake");
         require(amount > 0, "Cannot withdraw 0");
         uint256 oldR = calculateReward();
@@ -529,12 +532,12 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getTotalStaked() public view returns (uint256) {
+    function getTotalStaked() external view returns (uint256) {
         return tokenA.balanceOf(address(this));
     }
     
    
-    function claimMyReward() public nonReentrant whenNotPaused {
+    function claimMyReward() external nonReentrant whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to get the reward");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "staking balance cannot be 0");
@@ -548,7 +551,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		
 	}
 	
-	function withdrawERC20Token(address _tokenContract, uint256 _amount) external onlyOwner {
+	function withdrawERC20Token(address _tokenContract, uint256 _amount) external virtual onlyOwner {
         require(_tokenContract != address(0), "Address cant be zero address");
 		// require amount greter than 0
 		require(_amount > 0, "amount cannot be 0");
@@ -558,11 +561,11 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         emit ExternalTokenTransfered(_tokenContract, msg.sender, _amount);
 	}
 	
-	function getBalance() public view returns (uint256) {
+	function getBalance() internal view returns (uint256) {
         return address(this).balance;
     }
 	
-	function withdrawETHFromContract(uint256 amount) public onlyOwner {
+	function withdrawETHFromContract(uint256 amount) external virtual onlyOwner {
         require(amount <= getBalance());        
         address payable _owner = payable(msg.sender);        
         _owner.transfer(amount);        
@@ -570,14 +573,14 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     }
     
 
-    function setRewardRate(uint256 _rewardRate) external onlyOwner whenNotPaused {
+    function setRewardRate(uint256 _rewardRate) external virtual onlyOwner whenNotPaused {
         rewardRate = _rewardRate;
-        event SetRewardRate(uint256 rewardRate);
+        emit SetRewardRate(rewardRate);
     
     }
     
-    function setRewardToken(IERC20 _tokenA) external onlyOwner whenNotPaused {
+    function setRewardToken(IERC20 _tokenA) external virtual onlyOwner whenNotPaused {
         rewardToken = _tokenA;
-        event SetRewardToken(address rewardToken);
+        emit SetRewardToken(rewardToken);
     }
 }
