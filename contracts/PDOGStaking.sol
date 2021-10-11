@@ -474,8 +474,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		
 		tokenA.transferFrom(msg.sender, address(this), _amount);
 		emit StakeTransfer(msg.sender, address(this), _amount);
-		// update staking balance
+		// update user staking balance
 		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount;
+		// update Contract Staking balance
+		_totalSupply += _amount;
 		// update stakng status
 		stakingStartTime[msg.sender] = block.timestamp;
 		isStaking[msg.sender] = true;
@@ -491,13 +493,20 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         uint256 reward = calculateReward();
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         require(rewardToken.balanceOf(address(this)) > totalReward, "Not Enough tokens in the smart contract");
-        
-        rewardToken.transfer(msg.sender, totalReward);
-        emit Reward(address(this), msg.sender, totalReward);
-        
+        if(tokenA == rewardToken){
+            if((tokenA.balanceOf(address(this)) - totalReward)< _totalSupply){
+                totalReward = 0;
+            }
+        }
+        if(totalReward > 0){
+            rewardToken.transfer(msg.sender, totalReward);
+            oldReward[msg.sender] = 0;
+            emit Reward(address(this), msg.sender, totalReward);
+        }
 		tokenA.transfer(msg.sender, balance);
 		emit StakeTransfer(address(this), msg.sender, balance);
-		oldReward[msg.sender] = 0;
+		_totalSupply -= balance;
+		
 		// reset staking balance
 		stakedBalance[msg.sender] = 0;
 		// update staking status and stakingStartTime (restore to zero)
@@ -513,8 +522,9 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		if(balances > 0){
 		    uint256 timeDifferences = block.timestamp - stakingStartTime[msg.sender];
 		    //Reward Calculation
-		    rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(3600);
+		    rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(3600).div(10**18);
 		}
+		
 		return rewards;
 
     }
@@ -528,6 +538,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
             oldReward[msg.sender] = oldReward[msg.sender] + oldR;
         }
         stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(amount);
+        _totalSupply -= amount; 
         tokenA.transfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -536,14 +547,22 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         return tokenA.balanceOf(address(this));
     }
     
-   
+    
     function claimMyReward() external nonReentrant whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to get the reward");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "staking balance cannot be 0");
         uint256 reward = calculateReward();
         uint256 tReward = reward.add(oldReward[msg.sender]);
-        require(rewardToken.balanceOf(address(this)) > tReward, "Not Enough tokens in the smart contract");
+        if(tokenA == rewardToken){
+            if((tokenA.balanceOf(address(this)) - tReward)< _totalSupply){
+                tReward = 0;
+            }
+        }
+        if(tokenA!= rewardToken){
+            require(rewardToken.balanceOf(address(this)) > tReward, "Not Enough tokens in the smart contract");
+        }
+        require(tReward > 0, "Calculated reward is zero");
 		rewardToken.transfer(msg.sender, tReward);
         emit Reward(address(this), msg.sender, tReward);
 		//stakingStartTime (set to current time)
