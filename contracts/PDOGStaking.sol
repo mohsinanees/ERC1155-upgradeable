@@ -522,8 +522,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         //todo
         //require(rewardToken.balanceOf(address(this)) > totalReward, "Not Enough tokens in the smart contract");
       
-        bool rsuccess = rewardSend(totalReward);
-        require(rsuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
+        bool rSuccess = rewardSend(totalReward);
+        require(rSuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
         // unstaking of staked tokens 
 		tokenA.transfer(msg.sender, balance);
 		emit StakeTransfer(address(this), msg.sender, balance);
@@ -582,11 +582,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         uint256 rewardTokens = rewardToken.balanceOf(address(this));
         require(rewardTokens > tReward, "Not Enough tokens in the smart contract");
         
-        bool rsuccess = rewardSend(tReward);
+        bool rSuccess = rewardSend(tReward);
 		//stakingStartTime (set to current time)
-        if(rsuccess){
-            stakingStartTime[msg.sender] = block.timestamp;
-        }
+        require(rSuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
+        stakingStartTime[msg.sender] = block.timestamp;
 	}
 	
 	function withdrawERC20Token(address _tokenContract, uint256 _amount) external virtual onlyOwner {
