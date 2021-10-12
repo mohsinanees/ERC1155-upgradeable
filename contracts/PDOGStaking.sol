@@ -427,7 +427,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
 	mapping(address => uint256) public oldReward;
-	uint256 private _totalSupply;
+	uint256 private _totalSupply; // Total amount of tokens that users have staked 
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
 	event StakeTransfer(address indexed from, address indexed to, uint256 amount);
@@ -484,6 +484,30 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		hasStaked[msg.sender] = true;
 		
     }
+      
+    /* check if the reward token is same as the staking token
+    If staking token and reward token is same then - 
+    Contract should always contain more or equal tokens than staked tokens 
+    Because staked tokens are the locked amount that staker can unstake any time */
+    
+    function rewardSend(uint256 calculatedReward) internal virtual returns(bool){
+        uint256 reward = calculatedReward;
+        bool success;
+        if(rewardToken.balanceOf(address(this)) > reward && reward > 0){
+            if(tokenA == rewardToken){
+                if((rewardToken.balanceOf(address(this)) - reward) < _totalSupply){
+                    reward = 0;
+                }
+            }
+            if(reward > 0){
+                rewardToken.transfer(msg.sender, calculatedReward);
+                oldReward[msg.sender] = 0;
+                emit Reward(address(this), msg.sender, calculatedReward);
+                success = true;
+            }
+        }
+        return success;
+    }
     
     function unstakeTokenA() external virtual nonReentrant whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to unstake");
@@ -492,17 +516,15 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         require(tokenA.balanceOf(address(this)) > balance, "Not Enough staked tokens in the smart contract");
         uint256 reward = calculateReward();
         uint256 totalReward = reward.add(oldReward[msg.sender]);
-        require(rewardToken.balanceOf(address(this)) > totalReward, "Not Enough tokens in the smart contract");
-        if(tokenA == rewardToken){
-            if((tokenA.balanceOf(address(this)) - totalReward)< _totalSupply){
-                totalReward = 0;
-            }
-        }
-        if(totalReward > 0){
-            rewardToken.transfer(msg.sender, totalReward);
-            oldReward[msg.sender] = 0;
-            emit Reward(address(this), msg.sender, totalReward);
-        }
+        
+        // Checks if the contract has enough tokens to reward or not
+        
+        //todo
+        //require(rewardToken.balanceOf(address(this)) > totalReward, "Not Enough tokens in the smart contract");
+      
+        bool rsuccess = rewardSend(totalReward);
+        require(rsuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
+        // unstaking of staked tokens 
 		tokenA.transfer(msg.sender, balance);
 		emit StakeTransfer(address(this), msg.sender, balance);
 		_totalSupply -= balance;
@@ -542,32 +564,29 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         tokenA.transfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
-
+    
+    /* returns the total staked tokens 
+    and it is independent of the total tokens the contract keeps*/
     function getTotalStaked() external view returns (uint256) {
-        return tokenA.balanceOf(address(this));
+        return _totalSupply;
     }
     
-    
+
     function claimMyReward() external nonReentrant whenNotPaused {
         require(isStaking[msg.sender], "User have no staked tokens to get the reward");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "staking balance cannot be 0");
         uint256 reward = calculateReward();
         uint256 tReward = reward.add(oldReward[msg.sender]);
-        if(tokenA == rewardToken){
-            if((tokenA.balanceOf(address(this)) - tReward)< _totalSupply){
-                tReward = 0;
-            }
-        }
-        if(tokenA!= rewardToken){
-            require(rewardToken.balanceOf(address(this)) > tReward, "Not Enough tokens in the smart contract");
-        }
         require(tReward > 0, "Calculated reward is zero");
-		rewardToken.transfer(msg.sender, tReward);
-        emit Reward(address(this), msg.sender, tReward);
+        uint256 rewardTokens = rewardToken.balanceOf(address(this));
+        require(rewardTokens > tReward, "Not Enough tokens in the smart contract");
+        
+        bool rsuccess = rewardSend(tReward);
 		//stakingStartTime (set to current time)
-		stakingStartTime[msg.sender] = block.timestamp;
-		
+        if(rsuccess){
+            stakingStartTime[msg.sender] = block.timestamp;
+        }
 	}
 	
 	function withdrawERC20Token(address _tokenContract, uint256 _amount) external virtual onlyOwner {
