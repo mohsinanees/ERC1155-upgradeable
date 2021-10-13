@@ -518,12 +518,9 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         
         // Checks if the contract has enough tokens to reward or not
+   
+        rewardSend(totalReward);
         
-        //todo
-        //require(rewardToken.balanceOf(address(this)) > totalReward, "Not Enough tokens in the smart contract");
-      
-        bool rSuccess = rewardSend(totalReward);
-        require(rSuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
         // unstaking of staked tokens 
 		tokenA.transfer(msg.sender, balance);
 		emit StakeTransfer(address(this), msg.sender, balance);
