@@ -417,204 +417,204 @@ contract Pausable is Ownable {
 contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {		
     using SafeMath for uint256;
 	string public name = "PDOG - Staking";
-    IERC20 public tokenA;
-    IERC20 public rewardToken;
-    uint256 public rewardRate;
-    uint256 public blockLimit;
+
+    IERC20 public stakeToken; // Token which users stake to get reward
+    IERC20 public rewardToken; // holds token address which we are giving it as reward
+    uint256 public rewardRate; // APR of the staking
+    uint256 public blockLimit; // Block number after which reward should start
+    uint256 public rewardInterval; // Time difference for calculating reward, eg., Day, Months, Years, etc.,
 	address[] public stakers;
 	mapping(address=>uint256) public stakingStartTime; // to manage the time when the user started the staking 
 	mapping(address => uint) public stakedBalance;     // to manage the staking of token A  and distibue the profit as token B
-	mapping(address => bool) public hasStaked;
+	mapping(address => bool) public hasStaked; //
 	mapping(address => bool) public isStaking;
-	mapping(address => uint256) public oldReward;
-	uint256 private _totalSupply; // Total amount of tokens that users have staked 
+	mapping(address => uint256) public oldReward; //
+	uint256 private _totalStakedAmount; // Total amount of tokens that users have staked
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
-	event StakeTransfer(address indexed from, address indexed to, uint256 amount);
-	event Withdrawn(address indexed user, uint256 amount);
-	
-    event ExternalTokenTransfered(
-        address from,
-        address to,
-        uint256 amount
-    );
-    event EthFromContractTransferred(
-        uint256 amount
-    );
+	event StakedToken(address indexed from, address indexed to, uint256 amount);
+    event UnStakedToken(address indexed from, address indexed to, uint256 amount);
+	event WithdrawnFromStakedBalance(address indexed user, uint256 amount);
+    event ExternalTokenTransferred(address indexed from, address indexed to, uint256 amount);
+    event EthFromContractTransferred(uint256 amount);
+    event UpdatedRewardRate(uint256 rate);
+    event UpdatedRewardToken(IERC20 token);
+    event UpdatedRewardInterval(uint256 interval);
 
-    event SetRewardRate(uint256 rate);
-    event SetRewardToken(IERC20 token);
-
-    
-
-	constructor(IERC20 _tokenA, uint256 _rewardRate, uint256 _blockLimit) {
-		tokenA = _tokenA;
-		rewardToken = _tokenA;
+    /*
+    @dev during deployment, both staking and reward token are same.
+    PDOG Version 2.0 address - 0xBd65a197408230247F05247A71D1A9Aea9Db0C3c
+    */
+	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _blockLimit, uint256 _rewardInterval) {
+		stakeToken = _stakeToken;
+		rewardToken = _rewardToken;
         rewardRate = _rewardRate;
         blockLimit = _blockLimit;
+        rewardInterval = _rewardInterval;
 	}
 
-	/* Stakes Tokens (Deposit): An investor will deposit the TokenA into the smart contracts
+	/* Stakes Tokens (Deposit): An investor will deposit the stakeToken into the smart contracts
 	to starting earning rewards.
 		
-	Core Thing: Transfer the tokenA from the investor's wallet to this smart contract. */
-	function stakeTokenA(uint _amount) external virtual nonReentrant whenNotPaused {
-        require(block.number >= blockLimit, "current block number is below the Block Limit");		
-        require(_amount > 0, "staking balance cannot be 0");
-        require(tokenA.balanceOf(msg.sender) > _amount);
-		// add user to stakers array *only* if they haven't staked already
-		// save the time when they started staking 
+	Core Thing: Transfer the stakeToken from the investor's wallet to this smart contract. */
+	function stakeToken(uint _amount) external virtual nonReentrant whenNotPaused {
+        require(block.number >= blockLimit, "STAKING: Start Reward Block has not reached");
+        require(_amount > 0, "STAKING: Balance cannot be 0"); // Staking amount cannot be zero
+        require(stakeToken.balanceOf(msg.sender) > _amount); // Checking msg.sender balance
+
+        // add user to stakers array *only* if they haven't staked already
 		if(!hasStaked[msg.sender]) {
 			stakers.push(msg.sender);
 		}
 		if(isStaking[msg.sender]){
-		    uint256 oldR = calculateReward();
+		    uint256 oldR = calculateReward(msg.sender);
 		    oldReward[msg.sender] = oldReward[msg.sender] + oldR;
 		}
 		
-		tokenA.transferFrom(msg.sender, address(this), _amount);
-		emit StakeTransfer(msg.sender, address(this), _amount);
-		// update user staking balance
-		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount;
-		// update Contract Staking balance
-		_totalSupply += _amount;
-		// update stakng status
-		stakingStartTime[msg.sender] = block.timestamp;
+		stakeToken.transferFrom(msg.sender, address(this), _amount);
+		emit StakedToken(msg.sender, address(this), _amount);
+		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount; // update user staking balance
+		_totalStakedAmount += _amount; // update Contract Staking balance
+		stakingStartTime[msg.sender] = block.timestamp; // save the time when they started staking
+        // update staking status
 		isStaking[msg.sender] = true;
 		hasStaked[msg.sender] = true;
-		
     }
-      
-    /* check if the reward token is same as the staking token
-    If staking token and reward token is same then - 
-    Contract should always contain more or equal tokens than staked tokens 
-    Because staked tokens are the locked amount that staker can unstake any time */
     
-    function rewardSend(uint256 calculatedReward) internal virtual returns(bool){
+    function unStakeToken() external virtual nonReentrant whenNotPaused {
+        require(isStaking[msg.sender], "STAKING: No staked balance available");
+        uint balance = stakedBalance[msg.sender];
+        require(balance > 0, "STAKING: Balance cannot be 0");
+        require(stakeToken.balanceOf(address(this)) > balance, "STAKING: Not enough balance");
+        uint256 reward = calculateReward(msg.sender);
+        uint256 totalReward = reward.add(oldReward[msg.sender]);
+        SendRewardTo(totalReward,msg.sender); // Checks if the contract has enough tokens to reward or not
+        
+        // unstaking of staked tokens 
+		stakeToken.transfer(msg.sender, balance);
+		emit unStakedToken(address(this), msg.sender, balance);
+		_totalStakedAmount -= balance;
+
+		stakedBalance[msg.sender] = 0; // reset staking balance
+		isStaking[msg.sender] = false; // update staking status and stakingStartTime (restore to zero)
+		stakingStartTime[msg.sender] = 0;
+	}
+
+    /* @dev check if the reward token is same as the staking token
+    If staking token and reward token is same then -
+    Contract should always contain more or equal tokens than staked tokens
+    Because staked tokens are the locked amount that staker can unstake any time */
+    function SendRewardTo(uint256 calculatedReward, address _toAddress) internal virtual returns(bool){
+        require(_toAddress!=address(0), 'STAKING: Address cannot be zero');
         uint256 reward = calculatedReward;
-        bool success;
+        bool successStatus;
         if(rewardToken.balanceOf(address(this)) > reward && reward > 0){
-            if(tokenA == rewardToken){
-                if((rewardToken.balanceOf(address(this)) - reward) < _totalSupply){
+            if(stakeToken == rewardToken){
+                if((rewardToken.balanceOf(address(this)) - reward) < _totalStakedAmount){
                     reward = 0;
                 }
             }
             if(reward > 0){
-                rewardToken.transfer(msg.sender, calculatedReward);
-                oldReward[msg.sender] = 0;
-                emit Reward(address(this), msg.sender, calculatedReward);
-                success = true;
+                rewardToken.transfer(_toAddress, calculatedReward);
+                oldReward[_toAddress] = 0;
+                emit Reward(address(this), _toAddress, calculatedReward);
+                successStatus = true;
             }
         }
-        return success;
+        return successStatus;
     }
-    
-    function unstakeTokenA() external virtual nonReentrant whenNotPaused {
-        require(isStaking[msg.sender], "User have no staked tokens to unstake");
-        uint balance = stakedBalance[msg.sender];
-        require(balance > 0, "staking balance cannot be 0");
-        require(tokenA.balanceOf(address(this)) > balance, "Not Enough staked tokens in the smart contract");
-        uint256 reward = calculateReward();
-        uint256 totalReward = reward.add(oldReward[msg.sender]);
-        
-        // Checks if the contract has enough tokens to reward or not
-   
-        rewardSend(totalReward);
-        
-        // unstaking of staked tokens 
-		tokenA.transfer(msg.sender, balance);
-		emit StakeTransfer(address(this), msg.sender, balance);
-		_totalSupply -= balance;
-		
-		// reset staking balance
-		stakedBalance[msg.sender] = 0;
-		// update staking status and stakingStartTime (restore to zero)
-		isStaking[msg.sender] = false;
-		stakingStartTime[msg.sender] = 0;
-		
-	}
 
-    function calculateReward() public view returns(uint256){
-        uint balances = stakedBalance[msg.sender];
-		// require amount greter than 0
-		uint256 rewards = 0;
+    /*
+    @dev calculateReward() function returns the reward of the caller of this function
+    */
+    function calculateReward(address _rewardAddress) public view returns(uint256){
+        uint balances = stakedBalance[_rewardAddress];
+		uint256 rewards;
 		if(balances > 0){
-		    uint256 timeDifferences = block.timestamp - stakingStartTime[msg.sender];
-		    //Reward Calculation
-		    rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(3600).div(10**18);
+		    uint256 timeDifferences = block.timestamp - stakingStartTime[_rewardAddress];
+		    /* reward calculation
+		    Reward  = Staked Amount * Reward Rate (APY) *  TimeDiff / RewardInterval
+		    */
+            rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(rewardInterval).div(10**18);
 		}
-		
 		return rewards;
-
     }
-    
- 
-    function withdrawFromStaked(uint256 amount) external virtual nonReentrant {
-        require(isStaking[msg.sender], "User have no staked tokens to unstake");
-        require(amount > 0, "Cannot withdraw 0");
-        uint256 oldR = calculateReward();
-        if(oldR >0 && oldR <= rewardToken.balanceOf(address(this))){
-            oldReward[msg.sender] = oldReward[msg.sender] + oldR;
+
+    /*
+    @dev Users withdraw balance from the staked balance, reduced directly from the staked balance
+    */
+    function withdrawFromStakedBalance(uint256 amount) external virtual nonReentrant whenNotPaused{
+        require(isStaking[msg.sender], "STAKING: No staked balance available");
+        require(amount > 0, "STAKING: Cannot withdraw 0");
+        uint256 oldRewardAmount = calculateReward(msg.sender);
+        if(oldRewardAmount >0 && oldRewardAmount <= rewardToken.balanceOf(address(this))){
+            oldReward[msg.sender] = oldReward[msg.sender] + oldRewardAmount;
         }
         stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(amount);
-        _totalSupply -= amount; 
-        tokenA.transfer(msg.sender, amount);
-        emit Withdrawn(msg.sender, amount);
+        _totalStakedAmount -= amount;
+        stakeToken.transfer(msg.sender, amount);
+        emit WithdrawnFromStakedBalance(msg.sender, amount);
     }
     
-    /* returns the total staked tokens 
-    and it is independent of the total tokens the contract keeps*/
+    /* @dev returns the total staked tokens
+    and it is independent of the total tokens the contract keeps
+    */
     function getTotalStaked() external view returns (uint256) {
-        return _totalSupply;
+        return _totalStakedAmount;
     }
-    
 
+    /*
+    @dev function used to claim only the reward for the caller of the method
+    */
     function claimMyReward() external nonReentrant whenNotPaused {
-        require(isStaking[msg.sender], "User have no staked tokens to get the reward");
+        require(isStaking[msg.sender], "STAKING: No staked balance available");
         uint balance = stakedBalance[msg.sender];
-        require(balance > 0, "staking balance cannot be 0");
-        uint256 reward = calculateReward();
-        uint256 tReward = reward.add(oldReward[msg.sender]);
-        require(tReward > 0, "Calculated reward is zero");
+        require(balance > 0, "STAKING: Balance cannot be 0");
+        uint256 reward = calculateReward(msg.sender);
+        uint256 totalReward = reward.add(oldReward[msg.sender]);
+        require(totalReward > 0, "STAKING: Calculated Reward zero");
         uint256 rewardTokens = rewardToken.balanceOf(address(this));
-        require(rewardTokens > tReward, "Not Enough tokens in the smart contract");
-        
-        bool rSuccess = rewardSend(tReward);
+        require(rewardTokens > totalReward, "STAKING: Not Enough Balance");
+        bool rewardSuccessStatus = SendRewardTo(totalReward,msg.sender);
 		//stakingStartTime (set to current time)
-        require(rSuccess, "PS: can't unstake, reward calculated is zero or not enough reward supply");
+        require(rewardSuccessStatus, "STAKING: Claim Reward Failed");
         stakingStartTime[msg.sender] = block.timestamp;
 	}
 	
 	function withdrawERC20Token(address _tokenContract, uint256 _amount) external virtual onlyOwner {
-        require(_tokenContract != address(0), "Address cant be zero address");
-		// require amount greter than 0
-		require(_amount > 0, "amount cannot be 0");
+        require(_tokenContract != address(0), "STAKING: Address cant be zero address"); // 0 address validation
+		require(_amount > 0, "STAKING: amount cannot be 0"); // require amount greater than 0
         IERC20 tokenContract = IERC20(_tokenContract);
         require(tokenContract.balanceOf(address(this)) > _amount);
 		tokenContract.transfer(msg.sender, _amount);
-        emit ExternalTokenTransfered(_tokenContract, msg.sender, _amount);
+        emit ExternalTokenTransferred(_tokenContract, msg.sender, _amount);
 	}
 	
 	function getBalance() internal view returns (uint256) {
         return address(this).balance;
     }
-	
-	function withdrawETHFromContract(uint256 amount) external virtual onlyOwner {
-        require(amount <= getBalance());        
-        address payable _owner = payable(msg.sender);        
-        _owner.transfer(amount);        
-        emit EthFromContractTransferred(amount);
-    }
     
-
-    function setRewardRate(uint256 _rewardRate) external virtual onlyOwner whenNotPaused {
+    /*
+    @dev setting reward rate in weiAmount
+    */
+    function setRewardRate(uint256 _rewardRateInWei) external virtual onlyOwner whenNotPaused {
         rewardRate = _rewardRate;
-        emit SetRewardRate(rewardRate);
-    
+        emit UpdatedRewardRate(rewardRate);
     }
-    
-    function setRewardToken(IERC20 _tokenA) external virtual onlyOwner whenNotPaused {
-        rewardToken = _tokenA;
-        emit SetRewardToken(rewardToken);
+
+    /*
+    @dev setting reward token address
+    */
+    function setRewardToken(IERC20 _rewardToken) external virtual onlyOwner whenNotPaused {
+        rewardToken = _rewardToken;
+        emit UpdatedRewardToken(rewardToken);
+    }
+
+    /*
+    @dev setting reward interval
+    */
+    function setRewardInterval(uint256 _rewardInterval) external virtual onlyOwner whenNotPaused {
+        rewardInterval = _rewardInterval;
+        emit UpdatedRewardInterval(rewardInterval);
     }
 }
