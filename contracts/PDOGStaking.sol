@@ -1,4 +1,3 @@
-
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
@@ -62,7 +61,6 @@ abstract contract ReentrancyGuard {
     }
 }
 
-
 interface IERC20 {
 
     function totalSupply() external view returns (uint256);
@@ -77,7 +75,6 @@ interface IERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
-
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -413,10 +410,9 @@ contract Pausable is Ownable {
     }
 }
 
-
 contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {		
     using SafeMath for uint256;
-	string public name = "PDOG - Staking";
+	string public constant name = "PDOG - Staking";
 
     IERC20 public stakeToken; // Token which users stake to get reward
     IERC20 public rewardToken; // holds token address which we are giving it as reward
@@ -426,9 +422,9 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	address[] public stakers;
 	mapping(address=>uint256) public stakingStartTime; // to manage the time when the user started the staking 
 	mapping(address => uint) public stakedBalance;     // to manage the staking of token A  and distibue the profit as token B
-	mapping(address => bool) public hasStaked; //
+	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
-	mapping(address => uint256) public oldReward; //
+	mapping(address => uint256) public oldReward; // Stores the old reward
 	uint256 private _totalStakedAmount; // Total amount of tokens that users have staked
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
@@ -445,19 +441,19 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     @dev during deployment, both staking and reward token are same.
     PDOG Version 2.0 address - 0xBd65a197408230247F05247A71D1A9Aea9Db0C3c
     */
-	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _blockLimit, uint256 _rewardInterval) {
+	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRateInWei, uint256 _blockLimit, uint256 _rewardIntervalInSeconds) {
 		stakeToken = _stakeToken;
 		rewardToken = _rewardToken;
-        rewardRate = _rewardRate;
+        rewardRate = _rewardRateInWei;
         blockLimit = _blockLimit;
-        rewardInterval = _rewardInterval;
+        rewardInterval = _rewardIntervalInSeconds;
 	}
 
 	/* Stakes Tokens (Deposit): An investor will deposit the stakeToken into the smart contracts
 	to starting earning rewards.
 		
 	Core Thing: Transfer the stakeToken from the investor's wallet to this smart contract. */
-	function stakeToken(uint _amount) external virtual nonReentrant whenNotPaused {
+	function stakeTokenForReward(uint _amount) external virtual nonReentrant whenNotPaused {
         require(block.number >= blockLimit, "STAKING: Start Reward Block has not reached");
         require(_amount > 0, "STAKING: Balance cannot be 0"); // Staking amount cannot be zero
         require(stakeToken.balanceOf(msg.sender) > _amount); // Checking msg.sender balance
@@ -470,15 +466,17 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		    uint256 oldR = calculateReward(msg.sender);
 		    oldReward[msg.sender] = oldReward[msg.sender] + oldR;
 		}
-		
-		stakeToken.transferFrom(msg.sender, address(this), _amount);
-		emit StakedToken(msg.sender, address(this), _amount);
-		stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount; // update user staking balance
-		_totalStakedAmount += _amount; // update Contract Staking balance
-		stakingStartTime[msg.sender] = block.timestamp; // save the time when they started staking
-        // update staking status
-		isStaking[msg.sender] = true;
-		hasStaked[msg.sender] = true;
+
+        bool transferStatus = stakeToken.transferFrom(msg.sender, address(this), _amount);
+		if (transferStatus) {
+            emit StakedToken(msg.sender, address(this), _amount);
+            stakedBalance[msg.sender] = stakedBalance[msg.sender] + _amount; // update user staking balance
+            _totalStakedAmount += _amount; // update Contract Staking balance
+            stakingStartTime[msg.sender] = block.timestamp; // save the time when they started staking
+            // update staking status
+            isStaking[msg.sender] = true;
+            hasStaked[msg.sender] = true;
+        }
     }
     
     function unStakeToken() external virtual nonReentrant whenNotPaused {
@@ -491,13 +489,14 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         SendRewardTo(totalReward,msg.sender); // Checks if the contract has enough tokens to reward or not
         
         // unstaking of staked tokens 
-		stakeToken.transfer(msg.sender, balance);
-		emit unStakedToken(address(this), msg.sender, balance);
-		_totalStakedAmount -= balance;
-
-		stakedBalance[msg.sender] = 0; // reset staking balance
-		isStaking[msg.sender] = false; // update staking status and stakingStartTime (restore to zero)
-		stakingStartTime[msg.sender] = 0;
+		bool transferStatus = stakeToken.transfer(msg.sender, balance);
+        if(transferStatus){
+            emit UnStakedToken(address(this), msg.sender, balance);
+            _totalStakedAmount -= balance;
+            stakedBalance[msg.sender] = 0; // reset staking balance
+            isStaking[msg.sender] = false; // update staking status and stakingStartTime (restore to zero)
+            stakingStartTime[msg.sender] = 0;
+        }
 	}
 
     /* @dev check if the reward token is same as the staking token
@@ -507,7 +506,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     function SendRewardTo(uint256 calculatedReward, address _toAddress) internal virtual returns(bool){
         require(_toAddress!=address(0), 'STAKING: Address cannot be zero');
         uint256 reward = calculatedReward;
-        bool successStatus;
+        bool successStatus = false;
         if(rewardToken.balanceOf(address(this)) > reward && reward > 0){
             if(stakeToken == rewardToken){
                 if((rewardToken.balanceOf(address(this)) - reward) < _totalStakedAmount){
@@ -515,7 +514,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
                 }
             }
             if(reward > 0){
-                rewardToken.transfer(_toAddress, calculatedReward);
+                bool transferStatus = rewardToken.transfer(_toAddress, calculatedReward);
+                require(transferStatus, "STAKING: Transfer Failed");
                 oldReward[_toAddress] = 0;
                 emit Reward(address(this), _toAddress, calculatedReward);
                 successStatus = true;
@@ -529,13 +529,16 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     */
     function calculateReward(address _rewardAddress) public view returns(uint256){
         uint balances = stakedBalance[_rewardAddress];
-		uint256 rewards;
+		uint256 rewards = 0;
 		if(balances > 0){
 		    uint256 timeDifferences = block.timestamp - stakingStartTime[_rewardAddress];
 		    /* reward calculation
 		    Reward  = Staked Amount * Reward Rate (APY) *  TimeDiff / RewardInterval
 		    */
-            rewards = balances.mul(timeDifferences).mul(rewardRate).div(100).div(rewardInterval).div(10**18);
+            uint256 timeFactor = timeDifferences.div(rewardInterval);
+//            percentageFactor = rewardRate.div(100);
+//            rewards = ((balances.mul(timeDifferences).mul(rewardRate).div(100)).div(rewardInterval)).div(10**18);
+            rewards = balances.mul(timeFactor).mul(rewardRate).div(100).div(10**18);
 		}
 		return rewards;
     }
@@ -552,7 +555,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         }
         stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(amount);
         _totalStakedAmount -= amount;
-        stakeToken.transfer(msg.sender, amount);
+        bool transferStatus = stakeToken.transfer(msg.sender, amount);
+        require(transferStatus,"STAKING: Transfer Failed");
         emit WithdrawnFromStakedBalance(msg.sender, amount);
     }
     
@@ -586,7 +590,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		require(_amount > 0, "STAKING: amount cannot be 0"); // require amount greater than 0
         IERC20 tokenContract = IERC20(_tokenContract);
         require(tokenContract.balanceOf(address(this)) > _amount);
-		tokenContract.transfer(msg.sender, _amount);
+		bool transferStatus = tokenContract.transfer(msg.sender, _amount);
+        require(transferStatus,"STAKING: Transfer Failed");
         emit ExternalTokenTransferred(_tokenContract, msg.sender, _amount);
 	}
 	
@@ -598,8 +603,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     @dev setting reward rate in weiAmount
     */
     function setRewardRate(uint256 _rewardRateInWei) external virtual onlyOwner whenNotPaused {
-        rewardRate = _rewardRate;
-        emit UpdatedRewardRate(rewardRate);
+        rewardRate = _rewardRateInWei;
+        emit UpdatedRewardRate(_rewardRateInWei);
     }
 
     /*

@@ -19,11 +19,7 @@
  */
 
 const HDWalletProvider = require('@truffle/hdwallet-provider');
-const infuraKey = "";
-
-const fs = require('fs');
-const mnemonic = fs.readFileSync(".secret").toString().trim();
-const API_KEY = ""
+const {mnemonic, apiKey, infuraKey} = require('./secret.json');
 
 module.exports = {
   /**
@@ -79,6 +75,12 @@ module.exports = {
       network_id: 4,
       gas: 10000000
     },
+    testnet: {
+      networkCheckTimeout: 1000000000,
+      provider: () => new HDWalletProvider(mnemonic, `https://data-seed-prebsc-1-s1.binance.org:8545`),
+      network_id: 97,
+      gas: 10000000,
+    },
   },
 
   // Set default mocha options here, use special reporters etc.
@@ -100,6 +102,12 @@ module.exports = {
       }
     }
   },
+  plugins: [
+    'truffle-plugin-verify'
+  ],
 
+  api_keys: {
+    etherscan: apiKey
+  },
 
 };

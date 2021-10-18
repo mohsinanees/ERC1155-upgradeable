@@ -1,0 +1,28 @@
+{
+  "name": "pdog-staking",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blockchainxtech/pdog-staking.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Blockchainxtech/pdog-staking/issues"
+  },
+  "homepage": "https://github.com/Blockchainxtech/pdog-staking#readme",
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^1.5.1"
+  },
+  "devDependencies": {
+    "truffle-plugin-verify": "^0.5.15"
+  }
+}
