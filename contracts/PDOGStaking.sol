@@ -483,7 +483,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         require(isStaking[msg.sender], "STAKING: No staked balance available");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "STAKING: Balance cannot be 0");
-        require(stakeToken.balanceOf(address(this)) > balance, "STAKING: Not enough balance");
+        require(stakeToken.balanceOf(address(this)) >= balance, "STAKING: Not enough stake token balance");
         uint256 reward = calculateReward(msg.sender);
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         SendRewardTo(totalReward,msg.sender); // Checks if the contract has enough tokens to reward or not
@@ -505,15 +505,16 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     Because staked tokens are the locked amount that staker can unstake any time */
     function SendRewardTo(uint256 calculatedReward, address _toAddress) internal virtual returns(bool){
         require(_toAddress!=address(0), 'STAKING: Address cannot be zero');
-        uint256 reward = calculatedReward;
+        require(rewardToken.balanceOf(address(this)) >= calculatedReward, "STAKING: Not enough reward balance");
+
         bool successStatus = false;
-        if(rewardToken.balanceOf(address(this)) > reward && reward > 0){
+        if(rewardToken.balanceOf(address(this)) > calculatedReward && calculatedReward > 0){
             if(stakeToken == rewardToken){
-                if((rewardToken.balanceOf(address(this)) - reward) < _totalStakedAmount){
-                    reward = 0;
+                if((rewardToken.balanceOf(address(this)) - calculatedReward) < _totalStakedAmount){
+                    calculatedReward = 0;
                 }
             }
-            if(reward > 0){
+            if(calculatedReward > 0){
                 bool transferStatus = rewardToken.transfer(_toAddress, calculatedReward);
                 require(transferStatus, "STAKING: Transfer Failed");
                 oldReward[_toAddress] = 0;
