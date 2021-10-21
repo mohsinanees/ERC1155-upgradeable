@@ -456,7 +456,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	function stakeTokenForReward(uint _amount) external virtual nonReentrant whenNotPaused {
         require(block.number >= blockLimit, "STAKING: Start Reward Block has not reached");
         require(_amount > 0, "STAKING: Balance cannot be 0"); // Staking amount cannot be zero
-        require(stakeToken.balanceOf(msg.sender) > _amount); // Checking msg.sender balance
+        require(stakeToken.balanceOf(msg.sender) >= _amount); // Checking msg.sender balance
 
         // add user to stakers array *only* if they haven't staked already
 		if(!hasStaked[msg.sender]) {
