@@ -11,7 +11,7 @@ module.exports = async function (deployer, network) {
     /**
      * params - _stakeToken, _rewardToken, _rewardRateInWei, _blockLimit, _rewardIntervalInSeconds
      */
-    await deployer.deploy(PDOGStaking, pdog.address, pdog.address, ((10 ** 18)).toString(), web3.eth.getBlockNumber(), 10);
+    await deployer.deploy(PDOGStaking, pdog.address, pdog.address, ((10 ** 18)).toString(), web3.eth.getBlockNumber(), 60);
   }
   if(network === "testnet") {
     var web3 =  new Web3('https://data-seed-prebsc-1-s1.binance.org:8545');

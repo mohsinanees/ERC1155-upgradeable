@@ -443,7 +443,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 	Core Thing: Transfer the stakeToken from the investor's wallet to this smart contract. */
 	function stakeTokenForReward(uint _amount) external virtual nonReentrant whenNotPaused {
         require(block.number >= startBlock, "STAKING: Start Block has not reached");
-        require(block.number > stakingEndTime, "STAKING: Has ended");
+        if(stakingEndTime > 0) require(block.timestamp <= stakingEndTime, "STAKING: Has ended");
         require(_amount > 0, "STAKING: Balance cannot be 0"); // Staking amount cannot be zero
         require(stakeToken.balanceOf(msg.sender) >= _amount, "STAKING: Insufficient stake token balance"); // Checking msg.sender balance
 
