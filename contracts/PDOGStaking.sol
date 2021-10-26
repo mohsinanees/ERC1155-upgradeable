@@ -403,16 +403,16 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     IERC20 public stakeToken; // Token which users stake to get reward
     IERC20 public rewardToken; // holds token address which we are giving it as reward
     uint256 public rewardRate; // APR of the staking
-    uint256 public startBlock; // Block number after which reward should start
+    uint256 public startTime; // Block number after which reward should start
+    uint256 public endTime; // End time of staking
     uint256 public rewardInterval; // Time difference for calculating reward, eg., Day, Months, Years, etc.,
 	address[] public stakers;
-	mapping(address=>uint256) public stakingStartTime; // to manage the time when the user started the staking 
+	mapping(address => uint256) public stakingStartTime; // to manage the time when the user started the staking 
 	mapping(address => uint) public stakedBalance;     // to manage the staking of token A  and distibue the profit as token B
 	mapping(address => bool) public hasStaked;
 	mapping(address => bool) public isStaking;
 	mapping(address => uint256) public oldReward; // Stores the old reward
 	uint256 private _totalStakedAmount; // Total amount of tokens that users have staked
-    uint256 public stakingEndTime; // End time of staking
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
 	event StakedToken(address indexed from, address indexed to, uint256 amount);
@@ -425,15 +425,11 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     event UpdatedRewardInterval(uint256 interval);
     event UpdatedStakingEndTime(uint256 endTime);
 
-    /*
-    @dev during deployment, both staking and reward token are same.
-    PDOG Version 2.0 address - 0xBd65a197408230247F05247A71D1A9Aea9Db0C3c
-    */
-	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRateInWei, uint256 _blockLimit, uint256 _rewardIntervalInSeconds) {
+	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRateInWei, uint256 _startTime, uint256 _rewardIntervalInSeconds) {
 		stakeToken = _stakeToken;
 		rewardToken = _rewardToken;
         rewardRate = _rewardRateInWei;
-        startBlock = _blockLimit;
+        startTime = _startTime;
         rewardInterval = _rewardIntervalInSeconds;
 	}
 
@@ -442,8 +438,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		
 	Core Thing: Transfer the stakeToken from the investor's wallet to this smart contract. */
 	function stakeTokenForReward(uint _amount) external virtual nonReentrant whenNotPaused {
-        require(block.number >= startBlock, "STAKING: Start Block has not reached");
-        if(stakingEndTime > 0) require(block.timestamp <= stakingEndTime, "STAKING: Has ended");
+        require(block.timestamp >= startTime, "STAKING: Start Block has not reached");
+        if(endTime > 0) require(block.timestamp <= endTime, "STAKING: Has ended");
         require(_amount > 0, "STAKING: Balance cannot be 0"); // Staking amount cannot be zero
         require(stakeToken.balanceOf(msg.sender) >= _amount, "STAKING: Insufficient stake token balance"); // Checking msg.sender balance
 
@@ -518,13 +514,13 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     @dev calculateReward() function returns the reward of the caller of this function
     */
     function calculateReward(address _rewardAddress) public view returns(uint256){
-        uint balances = stakedBalance[_rewardAddress];
+        uint balances = stakedBalance[_rewardAddress] / 10**18;
 		uint256 rewards = 0;
 		if(balances > 0){
             uint256 timeDifferences;
-            if(stakingEndTime > 0){
-                if(block.timestamp > stakingEndTime){
-                    timeDifferences = stakingEndTime.sub(stakingStartTime[_rewardAddress]);
+            if(endTime > 0){
+                if(block.timestamp > endTime){
+                    timeDifferences = endTime.sub(stakingStartTime[_rewardAddress]);
                 }
                 else{
                     timeDifferences = block.timestamp - stakingStartTime[_rewardAddress];
@@ -534,10 +530,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
                 timeDifferences = block.timestamp - stakingStartTime[_rewardAddress];
             }
 		    /* reward calculation
-		    Reward  = Staked Amount * Reward Rate (APY) *  TimeDiff / RewardInterval
+		    Reward  = ((Total staked amount / User Staked Amount * 100) + timeFactor + Reward Rate (APY)) * User Staked Amount / 100
 		    */
             uint256 timeFactor = timeDifferences.div(rewardInterval);
-            rewards = balances.mul(timeFactor).mul(rewardRate).div(100).div(10**18);
+            rewards = (((balances/(_totalStakedAmount/10**18) * 100) + timeFactor + (rewardRate/10**18)) * balances / 100) * 10**18;
 		}
 		return rewards;
     }
@@ -626,7 +622,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     @dev setting staking end time
     */
     function setStakingEndTime(uint256 _endTime) external virtual onlyOwner whenNotPaused {
-        stakingEndTime = _endTime;
+        endTime = _endTime;
         emit UpdatedStakingEndTime(_endTime);
     }
 }
