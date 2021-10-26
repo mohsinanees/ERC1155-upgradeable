@@ -20,6 +20,6 @@ module.exports = async function (deployer, network) {
     /**
      * params - _stakeToken, _rewardToken, _rewardRateInWei, _blockLimit, _rewardIntervalInSeconds
      */
-    await deployer.deploy(PDOGStaking, pdog.address, pdog.address, ((10 ** 18)).toString(), 1635249600, 2419200);
+    await deployer.deploy(PDOGStaking, pdog.address, pdog.address, 20, 1635231236, 240);
   }
 };

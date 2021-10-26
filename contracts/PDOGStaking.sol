@@ -425,10 +425,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     event UpdatedRewardInterval(uint256 interval);
     event UpdatedStakingEndTime(uint256 endTime);
 
-	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRateInWei, uint256 _startTime, uint256 _rewardIntervalInSeconds) {
+	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _startTime, uint256 _rewardIntervalInSeconds) {
 		stakeToken = _stakeToken;
 		rewardToken = _rewardToken;
-        rewardRate = _rewardRateInWei;
+        rewardRate = _rewardRate;
         startTime = _startTime;
         rewardInterval = _rewardIntervalInSeconds;
 	}
@@ -532,8 +532,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		    /* reward calculation
 		    Reward  = ((Total staked amount / User Staked Amount * 100) + timeFactor + Reward Rate (APY)) * User Staked Amount / 100
 		    */
-            uint256 timeFactor = timeDifferences.div(rewardInterval);
-            rewards = (((balances/(_totalStakedAmount/10**18) * 100) + timeFactor + (rewardRate/10**18)) * balances / 100) * 10**18;
+            uint256 timeFactor = timeDifferences.div(60).div(60).div(24).div(7);
+            rewards = (((balances/(_totalStakedAmount/10**18) * 100) + timeFactor + ((rewardRate/52)*timeFactor)) * balances / 100) * 10**18;
 		}
 		return rewards;
     }
@@ -597,9 +597,9 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     /*
     @dev setting reward rate in weiAmount
     */
-    function setRewardRate(uint256 _rewardRateInWei) external virtual onlyOwner whenNotPaused {
-        rewardRate = _rewardRateInWei;
-        emit UpdatedRewardRate(_rewardRateInWei);
+    function setRewardRate(uint256 _rewardRate) external virtual onlyOwner whenNotPaused {
+        rewardRate = _rewardRate;
+        emit UpdatedRewardRate(_rewardRate);
     }
 
     /*
