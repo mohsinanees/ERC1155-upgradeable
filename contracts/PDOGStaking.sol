@@ -448,7 +448,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 			stakers.push(msg.sender);
 		}
 		if(isStaking[msg.sender]){
-		    uint256 oldR = calculateReward(msg.sender);
+		    (uint256 oldR,) = calculateReward(msg.sender);
 		    oldReward[msg.sender] = oldReward[msg.sender] + oldR;
 		}
 
@@ -469,7 +469,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "STAKING: Balance cannot be 0");
         require(stakeToken.balanceOf(address(this)) >= balance, "STAKING: Not enough stake token balance");
-        uint256 reward = calculateReward(msg.sender);
+        (uint256 reward,) = calculateReward(msg.sender);
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         SendRewardTo(totalReward,msg.sender); // Checks if the contract has enough tokens to reward or not
         
@@ -513,11 +513,11 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     /*
     @dev calculateReward() function returns the reward of the caller of this function
     */
-    function calculateReward(address _rewardAddress) public view returns(uint256){
+    function calculateReward(address _rewardAddress) public view returns(uint256, uint256){
         uint balances = stakedBalance[_rewardAddress] / 10**18;
 		uint256 rewards = 0;
+        uint256 timeDifferences;
 		if(balances > 0){
-            uint256 timeDifferences;
             if(endTime > 0){
                 if(block.timestamp > endTime){
                     timeDifferences = endTime.sub(stakingStartTime[_rewardAddress]);
@@ -532,10 +532,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		    /* reward calculation
 		    Reward  = ((Total staked amount / User Staked Amount * 100) + timeFactor + Reward Rate (APY)) * User Staked Amount / 100
 		    */
-            uint256 timeFactor = timeDifferences.div(60).div(60).div(24).div(7);
+            uint256 timeFactor = timeDifferences.div(60);
             rewards = (((balances/(_totalStakedAmount/10**18) * 100) + timeFactor + ((rewardRate/52)*timeFactor)) * balances / 100) * 10**18;
 		}
-		return rewards;
+		return (rewards, timeDifferences);
     }
 
     /*
@@ -544,7 +544,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     function withdrawFromStakedBalance(uint256 amount) external virtual nonReentrant whenNotPaused{
         require(isStaking[msg.sender], "STAKING: No staked token balance available");
         require(amount > 0, "STAKING: Cannot withdraw 0");
-        uint256 oldRewardAmount = calculateReward(msg.sender);
+        (uint256 oldRewardAmount,) = calculateReward(msg.sender);
         if(oldRewardAmount >0 && oldRewardAmount <= rewardToken.balanceOf(address(this))){
             oldReward[msg.sender] = oldReward[msg.sender] + oldRewardAmount;
         }
@@ -569,9 +569,10 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
         require(isStaking[msg.sender], "STAKING: No staked token balance available");
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "STAKING: Balance cannot be 0");
-        uint256 reward = calculateReward(msg.sender);
+        (uint256 reward, uint256 timeDifferences) = calculateReward(msg.sender);
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         require(totalReward > 0, "STAKING: Calculated Reward zero");
+        require(timeDifferences/rewardInterval >= 1, "STAKING: Can be claimed only after the interval");
         uint256 rewardTokens = rewardToken.balanceOf(address(this));
         require(rewardTokens > totalReward, "STAKING: Not Enough Reward Balance");
         bool rewardSuccessStatus = SendRewardTo(totalReward,msg.sender);
