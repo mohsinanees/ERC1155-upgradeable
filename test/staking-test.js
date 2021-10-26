@@ -73,14 +73,16 @@ contract('PDOG_STAKING', async accounts => {
 
             it("Should pass when calculating reward by owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
+                const pdog = await PDOG.deployed();
 
-                // moving timestamp
-                await advanceTime(61);
+                // moving timestamp to week
+                await advanceTime(604800);
                 // mining the block
                 await advanceBlock();
 
-                let reward = await pdogstaking.calculateReward(accounts[0]);
-                assert.equal(reward.toString(), (10**18).toString(), "Reward will be 1%");
+                var res = await pdogstaking.calculateReward(accounts[0]);
+
+                assert.equal(res[0].toString(), (1 *(10**18)).toString(), "Reward calculated for 1 week");
             });
         });
 
@@ -96,7 +98,7 @@ contract('PDOG_STAKING', async accounts => {
 
                 // Time has been moved in the previous test
                 let reward = await pdogstaking.calculateReward(accounts[1]);
-                assert.equal(reward.toString(), (10**18).toString(), "Reward will be 1%");
+                assert.equal(reward[0].toString(), (10**18).toString(), "Reward will be 1%");
             });
         });
     });
