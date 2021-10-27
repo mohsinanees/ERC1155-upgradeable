@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 
 /**
  * @dev Contract module that helps prevent reentrant calls to a function.
@@ -396,7 +398,7 @@ contract Pausable is Ownable {
     }
 }
 
-contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {		
+contract PDOGStaking is Ownable, Pausable, ReentrancyGuard, Initializable {
     using SafeMath for uint256;
 	string public constant name = "PDOG - Staking";
 
@@ -425,7 +427,7 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
     event UpdatedRewardInterval(uint256 interval);
     event UpdatedStakingEndTime(uint256 endTime);
 
-	constructor(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _startTime, uint256 _rewardIntervalInSeconds) {
+	function initialize(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _startTime, uint256 _rewardIntervalInSeconds) public initializer {
 		stakeToken = _stakeToken;
 		rewardToken = _rewardToken;
         rewardRate = _rewardRate;
