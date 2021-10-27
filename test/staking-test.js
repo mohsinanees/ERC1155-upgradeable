@@ -50,11 +50,11 @@ contract('PDOG_STAKING', async accounts => {
                 const pdogstaking = await PDOG_STAKING.deployed();
                 // transfer token from owner to non owner
                 await pdog.transfer(accounts[1],((100 * (10 ** 18)).toString()), {from: accounts[0]});
-        
+
                 await pdog.approve(pdogstaking.address, (100 * (10 ** 18)).toString(), {from: accounts[1]});
-        
+
                 let tx = await pdogstaking.stakeTokenForReward(((100 * (10 ** 18)).toString()),{from: accounts[1]});
-        
+
                 truffleAssert.eventEmitted(tx, 'StakedToken', (ev) => {
                     return ev.from === accounts[1]
                         && ev.to === pdogstaking.address;
@@ -82,7 +82,7 @@ contract('PDOG_STAKING', async accounts => {
 
                 var res = await pdogstaking.calculateReward(accounts[0]);
 
-                assert.equal(res[0].toString(), (51 *(10**18)).toString(), "Reward calculated for 1 week");
+                assert.equal(res[0].toString(), '51384615384615384615', "Reward calculated for 1 week");
             });
         });
 
@@ -98,7 +98,7 @@ contract('PDOG_STAKING', async accounts => {
 
                 // Time has been moved in the previous test
                 let reward = await pdogstaking.calculateReward(accounts[1]);
-                assert.equal(reward[0].toString(), (51*(10**18)).toString(), "Reward will be 1%");
+                assert.equal(reward[0].toString(), '51384615384615384615', "Reward will be 1%");
             });
         });
     });

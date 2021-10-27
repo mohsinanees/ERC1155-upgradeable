@@ -533,7 +533,8 @@ contract PDOGStaking is Ownable, Pausable, ReentrancyGuard {
 		    Reward  = ((Total staked amount / User Staked Amount * 100) + timeFactor + Reward Rate (APY)) * User Staked Amount / 100
 		    */
             uint256 timeFactor = timeDifferences.div(60).div(60).div(24).div(7);  //consider week
-            rewards = ((((balances*100)/(_totalStakedAmount/10**18)) + timeFactor + ((rewardRate*timeFactor)/52)) * balances / 100) * 10**18;
+            uint apyFactorInWei = (rewardRate*timeFactor)/52;
+            rewards = (((((balances*100)/(_totalStakedAmount/10**18))*(10**18)) + (timeFactor*(10**18)) + apyFactorInWei) * balances / 100);
 		}
 		return (rewards, timeDifferences);
     }
