@@ -82,7 +82,7 @@ contract('PDOG_STAKING', async accounts => {
 
                 var res = await pdogstaking.calculateReward(accounts[0]);
 
-                assert.equal(res[0].toString(), (1 *(10**18)).toString(), "Reward calculated for 1 week");
+                assert.equal(res[0].toString(), (51 *(10**18)).toString(), "Reward calculated for 1 week");
             });
         });
 
@@ -98,7 +98,7 @@ contract('PDOG_STAKING', async accounts => {
 
                 // Time has been moved in the previous test
                 let reward = await pdogstaking.calculateReward(accounts[1]);
-                assert.equal(reward[0].toString(), (10**18).toString(), "Reward will be 1%");
+                assert.equal(reward[0].toString(), (51*(10**18)).toString(), "Reward will be 1%");
             });
         });
     });
@@ -109,7 +109,7 @@ contract('PDOG_STAKING', async accounts => {
                 const pdog = await PDOG.deployed();
                 const pdogstaking = await PDOG_STAKING.deployed();
                 //Transfering the token that should be given as the reward
-                await pdog.transfer(pdogstaking.address,(100*(10**18)).toString())
+                await pdog.transfer(pdogstaking.address,(500*(10**18)).toString())
         
                 let tx = await pdogstaking.claimMyReward();
                 truffleAssert.eventEmitted(tx, 'Reward', (ev) => {
