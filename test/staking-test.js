@@ -145,6 +145,7 @@ contract('PDOG_STAKING', async accounts => {
                 // mining the block
                 await advanceBlock();
 
+
                 let tx = await pdogstaking.withdrawFromStakedBalance((50*(10**18)).toString(),{from: accounts[0]});
                 truffleAssert.eventEmitted(tx, 'WithdrawnFromStakedBalance', (ev) => {
                     return ev.user === accounts[0]
