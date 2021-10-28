@@ -2,6 +2,7 @@ const PDOG_STAKING = artifacts.require('PDOGStaking');
 const PDOG = artifacts.require('PDOG');
 const truffleAssert = require('truffle-assertions');
 const { advanceTime, advanceBlock } = require("./truffleTestHelper");
+const withdrawIntervalInSeconds = 604800;
 
 contract('PDOG_STAKING', async accounts => {
 
@@ -23,7 +24,7 @@ contract('PDOG_STAKING', async accounts => {
                 const pdog = await PDOG.deployed();
                 const pdogstaking = await PDOG_STAKING.deployed();
                 await pdog.approve(pdogstaking.address, (100 * (10 ** 18)).toString());
-        
+
                 let tx = await pdogstaking.stakeTokenForReward((100 * (10 ** 18)).toString());
                 truffleAssert.eventEmitted(tx, 'StakedToken', (ev) => {
                     return ev.from === accounts[0]
@@ -110,7 +111,7 @@ contract('PDOG_STAKING', async accounts => {
                 const pdogstaking = await PDOG_STAKING.deployed();
                 //Transfering the token that should be given as the reward
                 await pdog.transfer(pdogstaking.address,(500*(10**18)).toString())
-        
+
                 let tx = await pdogstaking.claimMyReward();
                 truffleAssert.eventEmitted(tx, 'Reward', (ev) => {
                     return ev.to === accounts[0]
@@ -122,7 +123,7 @@ contract('PDOG_STAKING', async accounts => {
         context("Reward Claiming - non-owner", async () => {
             it("Should pass when reward claimed by non-owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
                 let tx = await pdogstaking.claimMyReward({from: accounts[1]});
                 truffleAssert.eventEmitted(tx, 'Reward', (ev) => {
                     return ev.to === accounts[1]
@@ -136,7 +137,14 @@ contract('PDOG_STAKING', async accounts => {
         context("Withdraw balance from staked balance by owner", () => {
             it("Should pass when user withdraw some balance of the staked balance - owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[0]});
+                // moving timestamp
+                await advanceTime(withdrawIntervalInSeconds);
+                // mining the block
+                await advanceBlock();
+
                 let tx = await pdogstaking.withdrawFromStakedBalance((50*(10**18)).toString(),{from: accounts[0]});
                 truffleAssert.eventEmitted(tx, 'WithdrawnFromStakedBalance', (ev) => {
                     return ev.user === accounts[0]
@@ -148,7 +156,14 @@ contract('PDOG_STAKING', async accounts => {
         context("Withdraw balance from staked balance by non-owner", () => {
             it("Should pass when user withdraw some balance of the staked balance - non owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[1]});
+                // moving timestamp
+                await advanceTime(withdrawIntervalInSeconds);
+                // mining the block
+                await advanceBlock();
+
                 let tx = await pdogstaking.withdrawFromStakedBalance((50*(10**18)).toString(),{from: accounts[1]});
                 truffleAssert.eventEmitted(tx, 'WithdrawnFromStakedBalance', (ev) => {
                     return ev.user === accounts[1]
@@ -157,13 +172,16 @@ contract('PDOG_STAKING', async accounts => {
             });
         });
     });
-    
+
     describe("Unstake token", async () => {
         context("Unstake by owner", async () => {
             it("Should pass when user unstake the complete holding from the staking - owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[0]});
                 // moving timestamp
-                await advanceTime(61);
+                await advanceTime(withdrawIntervalInSeconds);
                 // mining the block
                 await advanceBlock();
 
@@ -180,12 +198,14 @@ contract('PDOG_STAKING', async accounts => {
 
             it("Should pass when user unstake the complete holding from the staking- non owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[1]});
                 // moving timestamp
-                await advanceTime(61);
+                await advanceTime(withdrawIntervalInSeconds);
                 // mining the block
                 await advanceBlock();
-                
+
                 let tx = await pdogstaking.unStakeToken({from: accounts[1]});
                 truffleAssert.eventEmitted(tx, 'UnStakedToken', (ev) => {
                     return ev.from === pdogstaking.address
@@ -196,7 +216,7 @@ contract('PDOG_STAKING', async accounts => {
 
             it("Should fail when user trying to unstake balance without staking - non-owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
                 try {
                     await pdogstaking.unStakeToken({from:accounts[1]});
                 } catch (err) {
@@ -212,7 +232,14 @@ contract('PDOG_STAKING', async accounts => {
             it("Should fail when user trying to withdraw balance from the staked balance without any staking before - owner", async () => {
                 const pdog = await PDOG.deployed();
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[0]});
+                // moving timestamp
+                await advanceTime(withdrawIntervalInSeconds);
+                // mining the block
+                await advanceBlock();
+
                 try {
                     await pdogstaking.withdrawFromStakedBalance((100*(10**18)).toString, {from:accounts[0]});
                 } catch (err) {
@@ -225,7 +252,14 @@ contract('PDOG_STAKING', async accounts => {
         context("Withdraw balance from staked balance without any staking before by non-owner", () => {
             it("Should fail when user trying to withdraw balance from the staked balance without any staking before - non-owner", async () => {
                 const pdogstaking = await PDOG_STAKING.deployed();
-        
+
+                //Request withdraw
+                await pdogstaking.requestWithdraw({from: accounts[1]});
+                // moving timestamp
+                await advanceTime(withdrawIntervalInSeconds);
+                // mining the block
+                await advanceBlock();
+
                 try {
                     await pdogstaking.withdrawFromStakedBalance((100*(10**18)).toString, {from:accounts[1]});
                 } catch (err) {
