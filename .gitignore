@@ -2,3 +2,4 @@ build/
 secret.json
 dist
 node_modules
+.openzeppelin

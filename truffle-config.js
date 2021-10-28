@@ -81,6 +81,12 @@ module.exports = {
       network_id: 97,
       gas: 10000000,
     },
+    testnet1: {
+      networkCheckTimeout: 1000000000,
+      provider: () => new HDWalletProvider(mnemonic, `https://data-seed-prebsc-1-s1.binance.org:8545`),
+      network_id: 97,
+      gas: 10000000,
+    },
   },
 
   // Set default mocha options here, use special reporters etc.
@@ -91,7 +97,7 @@ module.exports = {
   // Configure your compilers
   compilers: {
     solc: {
-      version: "0.8.0",       // Fetch exact version from solc-bin (default: truffle's version)
+      version: "0.8.2",       // Fetch exact version from solc-bin (default: truffle's version)
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       settings: {          // See the solidity docs for advice about optimization and evmVersion
        optimizer: {
@@ -107,7 +113,6 @@ module.exports = {
   ],
 
   api_keys: {
-    etherscan: apiKey
+    etherscan: ''
   },
-
 };
