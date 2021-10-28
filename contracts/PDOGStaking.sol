@@ -42,7 +42,7 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
 	mapping(address => uint256) public oldReward; // Stores the old reward
 	uint256 public _totalStakedAmount; // Total amount of tokens that users have staked
     mapping(address => uint256) public userTimeBounds; // mapping stores the withdraw time request
-    uint256 timeBound;
+    uint256 public timeBound;
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
 	event StakedToken(address indexed from, address indexed to, uint256 amount);
