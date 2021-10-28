@@ -1,6 +1,7 @@
 const PDOGStaking = artifacts.require("PDOGStaking");
 const PDOG = artifacts.require("PDOG");
 const Web3 = require('web3');
+const EinsteinStaking = artifacts.require("EinsteinStaking");
 const {deployProxy, upgradeProxy} = require("@openzeppelin/truffle-upgrades");
 
 module.exports = async function (deployer, network) {
@@ -44,6 +45,8 @@ module.exports = async function (deployer, network) {
     const APY = (20*(10**18)).toString();
     const START_TIME = Math.floor(new Date().getTime() / 1000);
     const REWARD_INTERVAL_IN_SECONDS = 2419200;
-    await deployProxy(PDOGStaking, [EINSTEIN_TOKEN,EINSTEIN_TOKEN,APY,START_TIME,REWARD_INTERVAL_IN_SECONDS],{ deployer, initializer: 'initialize' })
+    const PROXY_ADDRESS = '0x87a1C0803e709ad461a96aC34b7ad5B182554fAB';
+    // await deployProxy(PDOGStaking, [EINSTEIN_TOKEN,EINSTEIN_TOKEN,APY,START_TIME,REWARD_INTERVAL_IN_SECONDS],{ deployer, initializer: 'initialize' });
+    await upgradeProxy(PROXY_ADDRESS,EinsteinStaking,{ deployer });
   }
 };
