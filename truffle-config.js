@@ -87,6 +87,12 @@ module.exports = {
       network_id: 97,
       gas: 10000000,
     },
+    bscmainnet: {
+      networkCheckTimeout: 1000000000,
+      provider: () => new HDWalletProvider(mnemonic, `https://bsc-dataseed.binance.org/`),
+      network_id: 97,
+      gas: 10000000,
+    },
   },
 
   // Set default mocha options here, use special reporters etc.
