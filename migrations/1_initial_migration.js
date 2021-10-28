@@ -43,7 +43,7 @@ module.exports = async function (deployer, network) {
     const EINSTEIN_TOKEN = '0xBd65a197408230247F05247A71D1A9Aea9Db0C3c';
     const APY = (20*(10**18)).toString();
     const START_TIME = Math.floor(new Date().getTime() / 1000);
-    const REWARD_INTERVAL_IN_SECONDS = 60;
+    const REWARD_INTERVAL_IN_SECONDS = 2419200;
     await deployProxy(PDOGStaking, [EINSTEIN_TOKEN,EINSTEIN_TOKEN,APY,START_TIME,REWARD_INTERVAL_IN_SECONDS],{ deployer, initializer: 'initialize' })
   }
 };
