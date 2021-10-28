@@ -41,6 +41,8 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
 	mapping(address => bool) public isStaking;
 	mapping(address => uint256) public oldReward; // Stores the old reward
 	uint256 public _totalStakedAmount; // Total amount of tokens that users have staked
+    mapping(address => uint256) public userTimeBounds; // mapping stores the withdraw time request
+    uint256 timeBound;
 	
 	event Reward(address indexed from, address indexed to, uint256 amount);
 	event StakedToken(address indexed from, address indexed to, uint256 amount);
@@ -52,6 +54,8 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     event UpdatedRewardToken(IERC20 token);
     event UpdatedRewardInterval(uint256 interval);
     event UpdatedStakingEndTime(uint256 endTime);
+    event WithdrawRequested(address indexed to);
+    event TimeBoundChanged(uint256 newTimeBound);
 
 	function initialize(IERC20 _stakeToken, IERC20 _rewardToken, uint256 _rewardRate, uint256 _startTime, uint256 _rewardIntervalInSeconds) public virtual initializer {
 		stakeToken = _stakeToken;
@@ -59,6 +63,7 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
         rewardRate = _rewardRate;
         startTime = _startTime;
         rewardInterval = _rewardIntervalInSeconds;
+        timeBound = 604800;
         // initializing
         __Pausable_init();
         __Ownable_init_unchained();
@@ -104,6 +109,8 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
         uint balance = stakedBalance[msg.sender];
         require(balance > 0, "STAKING: Balance cannot be 0");
         require(stakeToken.balanceOf(address(this)) >= balance, "STAKING: Not enough stake token balance");
+        require(userTimeBounds[msg.sender] > 0, "STAKING: Request withdraw before withdraw");
+        require(block.timestamp >= (userTimeBounds[msg.sender]+ timeBound), "STAKING: Cannot withdraw within interval period");
         (uint256 reward,) = calculateReward(msg.sender);
         uint256 totalReward = reward.add(oldReward[msg.sender]);
         SendRewardTo(totalReward,msg.sender); // Checks if the contract has enough tokens to reward or not
@@ -117,6 +124,7 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
             isStaking[msg.sender] = false; // update staking status and stakingStartTime (restore to zero)
             stakingStartTime[msg.sender] = 0;
         }
+        userTimeBounds[msg.sender] = 0;
 	}
 
     /* @dev check if the reward token is same as the staking token
@@ -180,6 +188,8 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function withdrawFromStakedBalance(uint256 amount) external virtual nonReentrant whenNotPaused{
         require(isStaking[msg.sender], "STAKING: No staked token balance available");
         require(amount > 0, "STAKING: Cannot withdraw 0");
+        require(userTimeBounds[msg.sender] > 0, "STAKING: Request withdraw before withdraw");
+        require(block.timestamp >= (userTimeBounds[msg.sender]+ timeBound), "STAKING: Cannot withdraw within interval period");
         (uint256 oldRewardAmount,) = calculateReward(msg.sender);
         if(oldRewardAmount >0 && oldRewardAmount <= rewardToken.balanceOf(address(this))){
             oldReward[msg.sender] = oldReward[msg.sender] + oldRewardAmount;
@@ -189,6 +199,7 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
         bool transferStatus = stakeToken.transfer(msg.sender, amount);
         require(transferStatus,"STAKING: Transfer Failed");
         emit WithdrawnFromStakedBalance(msg.sender, amount);
+        userTimeBounds[msg.sender] = 0;
     }
     
     /* @dev returns the total staked tokens
@@ -261,5 +272,17 @@ contract PDOGStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuard
     function setStakingEndTime(uint256 _endTime) external virtual onlyOwner whenNotPaused {
         endTime = _endTime;
         emit UpdatedStakingEndTime(_endTime);
+    }
+/*
+@Dev user request for a withdraw
+*/
+    function requestWithdraw() external virtual whenNotPaused {
+        userTimeBounds[msg.sender] = block.timestamp;
+        emit WithdrawRequested(msg.sender);
+    }
+
+    function setTimeBound(uint256 _newTimeBound) external virtual onlyOwner whenNotPaused {
+        timeBound = _newTimeBound;
+        emit TimeBoundChanged(timeBound);
     }
 }
