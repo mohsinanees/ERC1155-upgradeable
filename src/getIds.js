@@ -16,7 +16,7 @@ async function fetchIds() {
     const web3 = new Web3(provider);
     const contract = new web3.eth.Contract(abi, contractAddress);
 
-    for (i = 1; i <= 10; i++) {
+    for (i = 1; i <= 1000; i++) {
         let URI = await contract.methods.uri(i).call();
         console.log(i);
         URIs.push(URI);

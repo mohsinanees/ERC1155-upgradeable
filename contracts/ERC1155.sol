@@ -32,11 +32,13 @@ contract AWSTERC1155 is
     }
 
     function _setURI(uint256 _tokenId, string memory _uri) private {
-        require(
-            bytes(uri(_tokenId)).length == 0,
-            "This token's URI already exists"
-        );
         _tokenURIs[_tokenId] = _uri;
+    }
+
+    function _setBatchURI(uint256[] ids, string[] memory uris) {
+        for (uint256 i = 0; i < ids.length; i++) {
+            _setURI(ids[i], uris[i]);
+        }
     }
 
     function mint(
@@ -47,22 +49,45 @@ contract AWSTERC1155 is
     ) public onlyOwner {
         _mint(account, _getNextTokenID(), amount, data);
         _setURI(_getNextTokenID(), _uri);
-        _incrementTokenTypeId(1);
+        _incrementTokenId();
     }
 
+    // In case ids supplied manually
     function mintBatch(
         address to,
-        uint256 quantity,
-        uint256[] memory values,
+        uint256[] ids,
+        string[] memory uris,
+        uint256[] values,
         bytes memory data
     ) public onlyOwner {
-        require(quantity == values.length);
-        uint256[] memory ids;
-        for (uint256 i = 0; i < quantity; i++) {
+        _mintBatch(to, ids, values, data);
+        _setBatchURI(ids, uris);
+    }
+
+    // In case of auto increment ids and single base URI
+    function mintBatch(
+        address to,
+        uint256 tokenCount,
+        uint256 values,
+        string memory _baseURI,
+        bytes memory data
+    ) public onlyOwner {
+        uint256[] ids = new uint256[](tokenCount);
+        string[] memory uris = new string[](tokenCount);
+        for (uint256 i = 0; i < tokenCount; i++) {
             ids[i] = _getNextTokenID();
+            uris[i] = string(
+                abi.encodePacked(
+                    _baseURI,
+                    "/",
+                    Strings.toString(ids[i]),
+                    ".json"
+                )
+            );
+            _incrementTokenId();
         }
         _mintBatch(to, ids, values, data);
-        _incrementTokenTypeId(quantity);
+        _setBatchURI(ids, uris);
     }
 
     function safeTransfer(
@@ -97,7 +122,7 @@ contract AWSTERC1155 is
     /**
      * @dev increments the value of _currentTokenID
      */
-    function _incrementTokenTypeId(uint256 incValue) private {
-        currentTokenID = currentTokenID + incValue;
+    function _incrementTokenId() private {
+        currentTokenID++;
     }
 }
