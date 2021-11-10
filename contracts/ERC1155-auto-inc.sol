@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 
-contract AWSTERC1155 is
+contract AWSTERC1155_auto is
     ERC1155Upgradeable,
     OwnableUpgradeable,
     PausableUpgradeable
@@ -19,7 +19,7 @@ contract AWSTERC1155 is
     mapping(uint256 => string) private _tokenURIs;
 
     /*
-     * State variable for storing the latest minted toke id
+     * State variable for storing the latest minted token id
      */
     uint256 public currentTokenID;
 
@@ -57,14 +57,28 @@ contract AWSTERC1155 is
         _incrementTokenId();
     }
 
-    // In case ids supplied manually
+    // In case of auto increment ids and single base URI
     function mintBatch(
         address to,
-        uint256[] memory ids,
-        string[] memory uris,
+        uint256 tokenCount,
+        string memory _baseURI,
         uint256[] memory values,
         bytes memory data
     ) public onlyOwner {
+        uint256[] memory ids = new uint256[](tokenCount);
+        string[] memory uris = new string[](tokenCount);
+        for (uint256 i = 0; i < tokenCount; i++) {
+            ids[i] = _getNextTokenID();
+            uris[i] = string(
+                abi.encodePacked(
+                    _baseURI,
+                    "/",
+                    StringsUpgradeable.toString(ids[i]),
+                    ".json"
+                )
+            );
+            _incrementTokenId();
+        }
         _mintBatch(to, ids, values, data);
         setBatchURI(ids, uris);
     }
